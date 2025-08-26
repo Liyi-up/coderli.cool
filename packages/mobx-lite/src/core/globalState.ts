@@ -1,13 +1,20 @@
 import { getGlobal } from "../global";
+import { Derivation, GlobalState } from "../types";
+
+
 import { Observer } from "./dependency";
 
 export const currentObserver = Symbol("currentObserver");
 const mobxGlobalState = Symbol("mobxGlobalState");
-class MobxGlobalState {
+
+class MobxGlobalState implements GlobalState {
   isBatching = false;
-  activeEffect: (() => void) | null = null;
+  activeReaction: (() => void) | null = null;
   observers = new WeakMap<object, Map<string | symbol, Set<Observer>>>();
-  pendingNotifications = new Set();
+  pendingReactions = new Set();
+  trackingDerivation: Derivation | null = null;
+  inBatch = 0;
+  runId = 0;
 }
 
 export let globalState: MobxGlobalState = (function () {

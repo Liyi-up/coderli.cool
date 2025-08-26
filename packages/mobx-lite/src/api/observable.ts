@@ -1,7 +1,6 @@
-import { collectDependency, notifyDependency } from "../core/dependency";
+import { track, trigger } from "../core/dependency";
 
 const observableKey = Symbol.for("isObservable");
-
 
 /**
  * 创建可观察对象
@@ -26,8 +25,8 @@ export function observable<T extends object>(target: T): T {
     return target;
   }
 
-  if(isSet(target)){
-    return target
+  if (isSet(target)) {
+    return target;
   }
 
   return new Proxy(target, {
@@ -42,7 +41,7 @@ export function observable<T extends object>(target: T): T {
         return observable(result);
       }
 
-      collectDependency(target, key);
+      track(target, key);
       return result;
     },
 
@@ -50,7 +49,7 @@ export function observable<T extends object>(target: T): T {
       const oldValue = Reflect.get(target, key, receiver);
       if (oldValue === value) return true;
       const result = Reflect.set(target, key, value, receiver);
-      notifyDependency(target, key);
+      trigger(target, key);
       return result;
     },
 
@@ -59,7 +58,7 @@ export function observable<T extends object>(target: T): T {
       const result = Reflect.deleteProperty(target, key);
 
       if (hadKey && result) {
-        notifyDependency(target, key);
+        trigger(target, key);
       }
 
       return result;

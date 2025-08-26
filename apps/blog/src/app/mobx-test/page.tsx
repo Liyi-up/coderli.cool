@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { observable, autorun, action } from "@coderli/mobx-lite";
+import { observable, autorun, action, computed } from "@coderli/mobx-lite";
 
 //
 const state = observable({
@@ -9,10 +9,6 @@ const state = observable({
   message: "Hello MobX-Lite",
   total: 0,
 });
-
-
-
-const arr = observable([1, 2, 3]);
 
 // 定义日志条目类型
 interface LogEntry {
@@ -44,13 +40,19 @@ const CounterComponent: React.FC = () => {
 
   // 设置autorun观察器 - 使用useEffect确保只在组件挂载时设置一次
   React.useEffect(() => {
-    autorun(() => {
-      logMessage(`count变化: ${count}`);
+    // 组件卸载时清理观察器
+    const computedTotal = computed(() => {
+      return state.count * 10;
     });
 
-    arr[0] = 100;
+    autorun(() => {
+      logMessage(` 计算结果: ${computedTotal}`);
+    });
 
-    // 组件卸载时清理观察器
+    action(() => {
+      state.count = 10;
+    })();
+
     return () => {
       //   countDisposer();
       //   messageDisposer();
@@ -63,7 +65,7 @@ const CounterComponent: React.FC = () => {
     setCurrentAction("增加计数");
     state.count++;
     state.total = state.count * 10;
-   
+    // count = Math.max(count, 10);
   });
 
   const updateMessage = action(() => {
@@ -76,7 +78,7 @@ const CounterComponent: React.FC = () => {
     state.count = 0;
     state.message = "Hello MobX-Lite";
     state.total = 0;
-    arr.push(111);
+   
   });
 
   const batchUpdate = action(() => {
@@ -86,9 +88,8 @@ const CounterComponent: React.FC = () => {
     state.count += 11;
     state.count += 22;
     state.count += 21;
-    count += 1;
     state.message = "Batch update completed";
-    // state.total = state.count * 10;
+
   });
 
   return (

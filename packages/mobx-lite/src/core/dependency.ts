@@ -5,9 +5,9 @@ export interface Observer {
   dirty?: () => void;
 }
 
-export function collectDependency(target: object, key: string | symbol): void {
-  const { observers, activeEffect } = globalState;
-  if (!activeEffect) {
+export function track(target: object, key: string | symbol): void {
+  const { observers, activeReaction } = globalState;
+  if (!activeReaction) {
     return;
   }
 
@@ -22,11 +22,11 @@ export function collectDependency(target: object, key: string | symbol): void {
     targetObservers.set(key, keyObservers);
   }
   // 将当前活跃的观察者添加到依赖集合
-  keyObservers.add(activeEffect);
+  keyObservers.add(activeReaction);
 }
 
-export function notifyDependency(target: object, key: string | symbol): void {
-  const { isBatching, observers, pendingNotifications } = globalState;
+export function trigger(target: object, key: string | symbol): void {
+  const { isBatching, observers, pendingReactions } = globalState;
   const targetObservers = observers.get(target);
   if (!targetObservers) {
     return;
@@ -36,7 +36,7 @@ export function notifyDependency(target: object, key: string | symbol): void {
     if (isBatching) {
       // 如果在action中，暂时存储需要触发的观察者
       observersSet.forEach((observer) => {
-        pendingNotifications.add(observer);
+        pendingReactions.add(observer);
       });
     } else {
       observersSet.forEach((observer) => observer());

@@ -23,9 +23,9 @@ var mobxGlobalState = Symbol("mobxGlobalState");
 var MobxGlobalState = /** @class */ (function () {
     function MobxGlobalState() {
         this.isBatching = false;
-        this.activeEffect = null;
+        this.activeReaction = null;
         this.observers = new WeakMap();
-        this.pendingNotifications = new Set();
+        this.pendingReactions = new Set();
     }
     return MobxGlobalState;
 }());
@@ -37,7 +37,15 @@ var globalState = (function () {
     return global[mobxGlobalState];
 })();
 
-function action(fn) {
+function action(nameOrFn, fn) {
+    var actionFn;
+    // 处理参数重载
+    if (typeof nameOrFn === 'string') {
+        actionFn = fn;
+    }
+    else {
+        actionFn = nameOrFn;
+    }
     var isBatching = globalState.isBatching;
     return function () {
         var args = [];
@@ -45,40 +53,40 @@ function action(fn) {
             args[_i] = arguments[_i];
         }
         if (isBatching) {
-            return fn.apply(void 0, args);
+            return actionFn.apply(void 0, args);
         }
         globalState.isBatching = true;
         try {
-            return fn.apply(void 0, args);
+            return fn === null || fn === void 0 ? void 0 : fn.apply(void 0, args);
         }
         finally {
             globalState.isBatching = false;
-            globalState.pendingNotifications.forEach(function (notification) {
+            globalState.pendingReactions.forEach(function (notification) {
                 notification();
             });
-            globalState.pendingNotifications.clear();
+            globalState.pendingReactions.clear();
         }
     };
 }
 
 function autorun(effect) {
     var run = function () {
-        var prev = globalState.activeEffect;
-        globalState.activeEffect = run;
+        var prev = globalState.activeReaction;
+        globalState.activeReaction = run;
         try {
             effect();
         }
         finally {
-            globalState.activeEffect = prev;
+            globalState.activeReaction = prev;
         }
     };
     // 初始化执行收集依赖
     run();
 }
 
-function collectDependency(target, key) {
-    var observers = globalState.observers, activeEffect = globalState.activeEffect;
-    if (!activeEffect) {
+function track(target, key) {
+    var observers = globalState.observers, activeReaction = globalState.activeReaction;
+    if (!activeReaction) {
         return;
     }
     var targetObservers = observers.get(target);
@@ -92,10 +100,10 @@ function collectDependency(target, key) {
         targetObservers.set(key, keyObservers);
     }
     // 将当前活跃的观察者添加到依赖集合
-    keyObservers.add(activeEffect);
+    keyObservers.add(activeReaction);
 }
-function notifyDependency(target, key) {
-    var isBatching = globalState.isBatching, observers = globalState.observers, pendingNotifications = globalState.pendingNotifications;
+function trigger(target, key) {
+    var isBatching = globalState.isBatching, observers = globalState.observers, pendingReactions = globalState.pendingReactions;
     var targetObservers = observers.get(target);
     if (!targetObservers) {
         return;
@@ -105,7 +113,7 @@ function notifyDependency(target, key) {
         if (isBatching) {
             // 如果在action中，暂时存储需要触发的观察者
             observersSet.forEach(function (observer) {
-                pendingNotifications.add(observer);
+                pendingReactions.add(observer);
             });
         }
         else {
@@ -115,8 +123,6 @@ function notifyDependency(target, key) {
 }
 
 var observableKey = Symbol.for("isObservable");
-var observableValueKey = Symbol.for("observableValue");
-var rawValueKey = Symbol.for("rawValue");
 /**
  * 创建可观察对象
  * @param obj 要创建可观察对象的对象
@@ -124,13 +130,19 @@ var rawValueKey = Symbol.for("rawValue");
  */
 function observable(target) {
     if (typeof target !== "object" || target == null) {
-        return createObservablePrimitive(target);
+        return target;
+    }
+    if (isObservable(target)) {
+        return target;
     }
     if (Array.isArray(target)) {
         // TODO: 数组的响应式处理
         return target;
     }
-    if (isObservable(target)) {
+    if (isMap(target)) {
+        return target;
+    }
+    if (isSet(target)) {
         return target;
     }
     return new Proxy(target, {
@@ -142,7 +154,7 @@ function observable(target) {
                 !isObservable(result)) {
                 return observable(result);
             }
-            collectDependency(target, key);
+            track(target, key);
             return result;
         },
         set: function (target, key, value, receiver) {
@@ -150,14 +162,14 @@ function observable(target) {
             if (oldValue === value)
                 return true;
             var result = Reflect.set(target, key, value, receiver);
-            notifyDependency(target, key);
+            trigger(target, key);
             return result;
         },
         deleteProperty: function (target, key) {
             var hadKey = Reflect.has(target, key);
             var result = Reflect.deleteProperty(target, key);
             if (hadKey && result) {
-                notifyDependency(target, key);
+                trigger(target, key);
             }
             return result;
         },
@@ -171,73 +183,97 @@ function observable(target) {
 function isObservable(value) {
     return (typeof value === "object" && value !== null && value[observableKey] === true);
 }
-function createObservablePrimitive(value) {
-    var _a;
-    // 对于null和undefined，直接返回
-    if (value === null || value === undefined) {
-        return value;
-    }
-    var wrapper = (_a = {},
-        _a[observableKey] = true,
-        _a[observableValueKey] = true,
-        _a[rawValueKey] = value,
-        Object.defineProperty(_a, "value", {
-            get: function () {
-                collectDependency(this, "value");
-                return value;
-            },
-            set: function (newValue) {
-                if (value !== newValue) {
-                    value = newValue;
-                    notifyDependency(this, "value");
-                }
-            },
-            enumerable: false,
-            configurable: true
-        }),
-        // 提供valueOf和toString方法，以便在需要时自动转换为原始值
-        _a.valueOf = function () {
-            return value;
-        },
-        _a.toString = function () {
-            return String(value);
-        },
-        _a[Symbol.toPrimitive] = function (hint) {
-            if (hint === "number" && typeof value === "boolean") {
-                return value ? 1 : 0;
-            }
-            return value;
-        },
-        _a);
-    // 使用Proxy确保属性访问被正确拦截
-    return new Proxy(wrapper, {
-        get: function (target, key, receiver) {
-            // 直接访问包装器对象的属性
-            var result = Reflect.get(target, key, receiver);
-            return result;
-        },
-        // 拦截二元运算符等操作
-        apply: function (target, thisArg, args) {
-            return value;
-        },
-        set: function (target, key, value, receiver) {
-            if (key === "value") {
-                target.value = value;
-                return true;
-            }
-            return Reflect.set(target, key, value, receiver);
-        },
-        has: function (target, key) {
-            if (key === "value")
-                return true;
-            // @ts-ignore
-            return key in value;
-        },
-    });
+/**
+ * 检查一个对象是否是Map
+ * @param value 要检查的值
+ * @returns 是否是Map
+ */
+function isMap(value) {
+    return value instanceof Map;
+}
+function isSet(value) {
+    return value instanceof Set;
 }
 observable[observableKey] = true;
 
+function toPrimitive(value) {
+    return value === null ? null : typeof value === "object" ? "" + value : value;
+}
+
+var ComputedRef = /** @class */ (function () {
+    function ComputedRef(computedFn) {
+        var _this = this;
+        this._dirty = true; // 是否需要重新计算
+        // 依赖此属性的所有观察者
+        this.dependencies = new Set();
+        this.computedFn = computedFn;
+        this.effect = function () {
+            _this._dirty = true;
+            _this.dependencies.forEach(function (effect) { return effect(); });
+        };
+    }
+    ComputedRef.prototype[Symbol.toPrimitive] = function () {
+        return this.valueOf();
+    };
+    ComputedRef.prototype.valueOf = function () {
+        return toPrimitive(this.value);
+    };
+    Object.defineProperty(ComputedRef.prototype, "value", {
+        /**
+         * 获取计算属
+         */
+        get: function () {
+            var activeReaction = globalState.activeReaction;
+            // 收集观察者
+            if (activeReaction) {
+                this.dependencies.add(activeReaction);
+            }
+            if (this._dirty) {
+                // 保存当前活跃的副作用
+                var prevEffect = activeReaction;
+                // 将当前的计算属性effect 设为活跃副作用
+                globalState.activeReaction = this.effect;
+                // 执行计算函数
+                this._value = this.computedFn();
+                // 计算完成后，将活跃副作用设为之前的副作用
+                globalState.activeReaction = prevEffect;
+                this._dirty = false;
+            }
+            return this._value;
+        },
+        enumerable: false,
+        configurable: true
+    });
+    ComputedRef.prototype.refresh = function () {
+        this._dirty = true;
+        this.value; // 触发重新计算
+    };
+    return ComputedRef;
+}());
+function computed(computeFn) {
+    return new ComputedRef(computeFn);
+}
+
+function runInAction(nameOrFn, fn) {
+    var name;
+    var actionFn;
+    // 处理参数重载
+    if (typeof nameOrFn === "string") {
+        name = nameOrFn;
+        actionFn = fn;
+    }
+    else {
+        actionFn = nameOrFn;
+        name = "runInAction";
+    }
+    // 创建临时action并立即执行
+    var tempAction = action(name, actionFn);
+    return tempAction();
+}
+
 exports.action = action;
 exports.autorun = autorun;
+exports.computed = computed;
 exports.observable = observable;
+exports.runInAction = runInAction;
 //# sourceMappingURL=index.js.map
