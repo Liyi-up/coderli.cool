@@ -39,7 +39,7 @@ class Atom implements IObservable {
   }
 
   /**
-   * 通知所有依赖当前Atom实例的派生发生变化，
+   * 通知所有依赖当前Atom实例的派生Atom发生变化，
    */
   public reportChanged(): void {
     // 通知所有观察者

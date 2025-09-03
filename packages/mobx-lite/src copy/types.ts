@@ -1,4 +1,4 @@
-import Reaction from "./core/reaction";
+
 
 export interface GlobalState {
   /** 当前正在追踪的派生 */
@@ -10,7 +10,7 @@ export interface GlobalState {
   /** 是否正在运行反应队列 */
   isRunningReactions: boolean;
   /** 待处理的反应队列 */
-  pendingReactions: Set<Reaction>;
+  pendingReactions: Set<()=>void>;
   /** 是否允许状态修改 */
   allowStateChanges: boolean;
 }

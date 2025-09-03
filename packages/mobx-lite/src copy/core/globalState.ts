@@ -1,13 +1,17 @@
 import { getGlobal } from "../global";
 import { Derivation, GlobalState } from "../types";
 
-import Reaction from "./reaction";
+
+
 
 export const currentObserver = Symbol("currentObserver");
 const mobxGlobalState = Symbol("mobxGlobalState");
 
 class MobxGlobalState implements GlobalState {
-  pendingReactions = new Set<Reaction>();
+  isBatching = false;
+  activeReaction: (() => void) | null = null;
+  observers = new WeakMap<object, Map<string | symbol, Set<()=>void>>>();
+  pendingReactions = new Set<()=>void>();
   trackingDerivation: Derivation | null = null;
   inBatch = 0;
   runId = 0;

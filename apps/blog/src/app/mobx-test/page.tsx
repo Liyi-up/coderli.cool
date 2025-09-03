@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { observable, autorun, action, computed } from "@coderli/mobx-lite";
+import { observable, autorun } from "@coderli/mobx-lite";
 
 //
 const state = observable({
@@ -40,48 +40,38 @@ const CounterComponent: React.FC = () => {
 
   // 设置autorun观察器 - 使用useEffect确保只在组件挂载时设置一次
   React.useEffect(() => {
-    // 组件卸载时清理观察器
-    const computedTotal = computed(() => {
-      return state.count * 10;
+    const messageDisposer = autorun(() => {
+      logMessage(
+        `count: ${state.count}, message: ${state.message}, total: ${state.total}`
+      );
     });
-
-    autorun(() => {
-      logMessage(` 计算结果: ${computedTotal}`);
-    });
-
-    action(() => {
-      state.count = 10;
-    })();
 
     return () => {
-      //   countDisposer();
-      //   messageDisposer();
-      //   combinedDisposer();
+      messageDisposer();
     };
   }, []);
 
   // 创建action函数，并添加操作标识
-  const increment = action(() => {
+  const increment = () => {
     setCurrentAction("增加计数");
     state.count++;
     state.total = state.count * 10;
     // count = Math.max(count, 10);
-  });
+  };
 
-  const updateMessage = action(() => {
+  const updateMessage = () => {
     setCurrentAction("更新消息");
     state.message = `Updated at ${new Date().toLocaleTimeString()}`;
-  });
+  };
 
-  const resetAll = action(() => {
+  const resetAll = () => {
     setCurrentAction("重置");
     state.count = 0;
     state.message = "Hello MobX-Lite";
     state.total = 0;
-   
-  });
+  };
 
-  const batchUpdate = action(() => {
+  const batchUpdate = () => {
     setCurrentAction("批量更新");
     // 多个状态更新只会触发一次批处理
     state.count += 5;
@@ -89,8 +79,7 @@ const CounterComponent: React.FC = () => {
     state.count += 22;
     state.count += 21;
     state.message = "Batch update completed";
-
-  });
+  };
 
   return (
     <div className="p-6 max-w-3xl mx-auto bg-white rounded-lg shadow-lg">

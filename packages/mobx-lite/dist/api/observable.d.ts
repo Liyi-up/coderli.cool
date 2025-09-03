@@ -1,8 +1,4 @@
-/**
- * 创建可观察对象
- * @param obj 要创建可观察对象的对象
- * @returns 可观察对象
- */
-export declare function observable<T extends object>(target: T): T;
-export declare namespace observable { }
+import ObservableValue from "../core/observablevalue";
+declare function observable<T extends object>(value: T): T;
+declare function observable<T>(value: T): ObservableValue<T>;
 export default observable;

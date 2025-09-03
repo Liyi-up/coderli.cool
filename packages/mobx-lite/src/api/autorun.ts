@@ -1,18 +1,17 @@
-import { globalState } from "../core/globalState";
+import Reaction from "../core/reaction";
 
-function autorun(effect: () => void) {
-  const run = () => {
-    const prev = globalState.activeReaction;
-    globalState.activeReaction = run;
-    try {
-      effect();
-    } finally {
-      globalState.activeReaction = prev;
-    }
+/**
+ * 创建一个自动运行的反应
+ * 当依赖的可观察数据变化时，自动重新执行提供的函数
+ * @param fn 要自动运行的函数
+ * @returns 清理函数，调用后停止自动运行
+ */
+function autorun(fn: () => void) {
+  const reaction = new Reaction("Autorun", fn);
+  reaction.runReaction();
+  return function dispose() {
+    reaction.dispose();
   };
-  // 初始化执行收集依赖
-  run();
-  
 }
 
 export default autorun;
