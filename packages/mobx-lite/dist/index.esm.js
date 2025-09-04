@@ -57,8 +57,6 @@ function getGlobal() {
 var mobxGlobalState = Symbol("mobxGlobalState");
 var MobxGlobalState = /** @class */ (function () {
     function MobxGlobalState() {
-        this.activeReaction = null;
-        this.observers = new WeakMap();
         this.pendingReactions = new Set();
         this.trackingDerivation = null;
         this.inBatch = 0;
@@ -442,6 +440,7 @@ var ObservableObject = /** @class */ (function () {
             if (Array.isArray(value)) ;
             else if (typeof value === "object" &&
                 !(value instanceof ObservableObject)) {
+                debugger;
                 value = new ObservableObject(value);
             }
         }

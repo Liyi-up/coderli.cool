@@ -113,6 +113,7 @@ class ObservableObject<T extends object> implements IObservableObject<T> {
    * @param value 属性值
    */
   private makePropertyObservable(prop: string | number | symbol, value: any) {
+   
     if (typeof value === "object" && value !== null) {
       if (Array.isArray(value)) {
         // TODO: 数组的响应式处理
@@ -120,6 +121,7 @@ class ObservableObject<T extends object> implements IObservableObject<T> {
         typeof value === "object" &&
         !(value instanceof ObservableObject)
       ) {
+        debugger
         value = new ObservableObject(value);
       }
     }

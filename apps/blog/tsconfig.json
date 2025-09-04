@@ -19,6 +19,7 @@
       }
     ],
     "paths": {
+      "@coderli/mobx-lite": ["../../packages/mobx-lite/src/index.ts"],
       "@/*": ["./src/*"]
     }
   },
